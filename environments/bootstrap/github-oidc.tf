@@ -28,7 +28,8 @@ data "aws_iam_policy_document" "github_assume" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:nistestaws/terraform-upskilling-project:*"]
+      values   = ["repo:nistestaws@152171352/terraform-upskilling-project@1307393834:*"]
+
     }
   }
 }
