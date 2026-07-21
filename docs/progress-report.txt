@@ -194,6 +194,45 @@ ISOLATION PROOF: dev responds "environment":"dev", staging responds "environment
 
 TASK 4 STATUS: COMPLETE.
 
+------------------------------------------------------------------------------------------------------------------------
+GIT / GITHUB SETUP [COMPLETE]
+------------------------------------------------------------------------------------------------------------------------
+- Repo root = terraform-project/ (practice folders 01-basics..10 kept separate).
+- Created .gitignore (ignores *.tfstate, .terraform/, function.zip/*.zip; KEEPS .terraform.lock.hcl).
+- git init + commit + push to GitHub.
+- Remote: https://github.com/nistestaws/terraform-upskilling-project  (branch: main).
+- VERIFIED: git ls-files shows NO tfstate / .terraform / zip tracked. Lock files committed. Clean.
+
+
+------------------------------------------------------------------------------------------------------------------------
+TASK 6 - CI/CD PIPELINE (GitHub Actions) [IN PROGRESS]
+------------------------------------------------------------------------------------------------------------------------
+DECISION: AWS auth = OIDC (Option A) - no long-lived secrets in GitHub. Best practice.
+
+VERIFIED (AWS + GitHub docs, no guessing):
+  - OIDC provider URL: token.actions.githubusercontent.com ; audience: sts.amazonaws.com
+  - Thumbprint NO LONGER required (AWS trusted-CA library); thumbprint_list optional in provider v5.x+/v6.
+  - Flow: sts:AssumeRoleWithWebIdentity, scoped by sub claim = repo:nistestaws/terraform-upskilling-project:*
+
+STEP 6a - OIDC PROVIDER + IAM ROLE (Terraform in bootstrap) [GUIDANCE PROVIDED]:
+  - New file: environments/bootstrap/github-oidc.tf
+  - Resources: aws_iam_openid_connect_provider.github, aws_iam_role.github_actions,
+               aws_iam_role_policy.github_actions. Output: github_actions_role_arn.
+  - Permissions: lambda:*, apigateway:*, logs:*, IAM for lambda exec role, S3 state, DynamoDB lock.
+  - KNOWN LIMITATION (to note in docs/notes.md): policy is broad, not least-privilege.
+                     Future improvement: scope IAM resources tighter.
+  - APPLIED: 3 added. Output github_actions_role_arn =
+             arn:aws:iam::122788298805:role/github-actions-terraform  (account 122788298805)
+  - STEP 6a STATUS: COMPLETE.
+
+STEP 6b - GitHub Environments (dev auto, staging manual approval) [GUIDANCE PROVIDED]:
+  - In GitHub repo Settings > Environments: create "dev" and "staging".
+  - staging: add Required reviewers protection rule = manual approval gate (Git-driven workflow req).
+STEP 6c - Workflow YAML (.github/workflows/deploy.yml) [GUIDANCE PROVIDED]:
+  - PR to main -> terraform plan (dev) validation.
+  - push to main -> apply dev (auto) then apply staging (gated by approval).
+  - Uses OIDC role above; builds app/function.zip before terraform.
+
 
 ========================================================================================================================
 NEXT STEPS

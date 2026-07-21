@@ -1,0 +1,106 @@
+name: Terraform CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Required for OIDC: the workflow must be allowed to request the identity token
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ROLE_ARN: arn:aws:iam::122788298805:role/github-actions-terraform
+  TF_VERSION: 1.9.8
+
+jobs:
+  # ---------- PLAN on pull requests (validation only) ----------
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # - name: Debug OIDC claims
+      #   run: |
+      #     TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+      #       "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r '.value')
+      #     echo "$TOKEN" | cut -d '.' -f2 | base64 -d 2>/dev/null | jq '{sub, aud, repository, repository_owner, event_name, ref}'
+
+
+      - name: Package Lambda
+        run: cd app && zip -r function.zip app.py
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init & Plan (dev)
+        working-directory: environments/dev
+        run: |
+          terraform init
+          terraform plan
+
+  # ---------- DEPLOY DEV on merge to main (automatic) ----------
+  deploy-dev:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package Lambda
+        run: cd app && zip -r function.zip app.py
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Apply (dev)
+        working-directory: environments/dev
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+  # ---------- DEPLOY STAGING (waits for manual approval) ----------
+  deploy-staging:
+    if: github.event_name == 'push'
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package Lambda
+        run: cd app && zip -r function.zip app.py
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Apply (staging)
+        working-directory: environments/staging
+        run: |
+          terraform init
+          terraform apply -auto-approve
