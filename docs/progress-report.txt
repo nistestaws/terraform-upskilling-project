@@ -225,13 +225,51 @@ STEP 6a - OIDC PROVIDER + IAM ROLE (Terraform in bootstrap) [GUIDANCE PROVIDED]:
              arn:aws:iam::122788298805:role/github-actions-terraform  (account 122788298805)
   - STEP 6a STATUS: COMPLETE.
 
-STEP 6b - GitHub Environments (dev auto, staging manual approval) [GUIDANCE PROVIDED]:
-  - In GitHub repo Settings > Environments: create "dev" and "staging".
-  - staging: add Required reviewers protection rule = manual approval gate (Git-driven workflow req).
-STEP 6c - Workflow YAML (.github/workflows/deploy.yml) [GUIDANCE PROVIDED]:
+STEP 6b - GitHub Environments (dev auto, staging manual approval) [COMPLETE]:
+  - Created "dev" and "staging" environments via GitHub UI.
+  - staging: Required reviewers protection rule = manual approval gate (Git-driven workflow req).
+STEP 6c - Workflow YAML (.github/workflows/deploy.yml) [CREATED + PR PLAN JOB PASSING]:
   - PR to main -> terraform plan (dev) validation.
   - push to main -> apply dev (auto) then apply staging (gated by approval).
   - Uses OIDC role above; builds app/function.zip before terraform.
+
+ISSUE #3 - OIDC "Not authorized to perform sts:AssumeRoleWithWebIdentity" [RESOLVED]:
+  - Ruled out (via aws iam CLI): provider exists, ClientIDList=sts.amazonaws.com, thumbprint present,
+    trust policy textually correct, owner/repo casing correct.
+  - ROOT CAUSE (decoded actual token sub via a debug step - facts, not guessing):
+    GitHub issues IMMUTABLE-ID subject format:
+        repo:nistestaws@152171352/terraform-upskilling-project@1307393834:pull_request
+    Our condition repo:nistestaws/terraform-upskilling-project:* did NOT match (no @IDs).
+  - FIX: sub condition -> repo:nistestaws@152171352/terraform-upskilling-project@1307393834:*
+    then terraform apply (1 changed). PR plan job re-run = SUCCESS. OIDC working end-to-end.
+  - Debug step removed from deploy.yml; corrected github-oidc.tf committed. Belongs in docs/troubleshooting.md.
+
+------------------------------------------------------------------------------------------------------------------------
+FULL PIPELINE RUN [COMPLETE - EVIDENCE]
+------------------------------------------------------------------------------------------------------------------------
+- PR add-cicd-pipeline -> main: plan job green (PR validation).
+- Merged to main -> push trigger:
+    deploy-dev ....... GREEN (auto apply to dev via CI/CD).
+    deploy-staging ... GREEN after manual approval (Required reviewers gate).
+- END-TO-END Git-driven CI/CD proven: PR plan -> merge -> auto dev -> manual approval -> staging.
+- Satisfies: Git-driven workflow, two environments, manual approval, infra+app deploy via pipeline.
+
+TASK 6 STATUS: COMPLETE.
+TASK 7 STATUS: COMPLETE (dev -> staging promotion with manual approval gate).
+
+------------------------------------------------------------------------------------------------------------------------
+TASK 8 - DOCUMENTATION [COMPLETE]
+------------------------------------------------------------------------------------------------------------------------
+Created all required docs in docs/ and updated README.md:
+  - architecture.md ............ architecture + diagram + design decisions
+  - environment-separation.md .. isolation strategy + proof + scaling to prod
+  - cicd-workflow.md ........... beginner CI/CD guide with diagram
+  - deployment.md .............. bootstrap + CI/CD + manual + teardown steps
+  - troubleshooting.md ......... 8 issues incl. the OIDC immutable-ID fix
+  - faq.md ..................... common questions
+  - notes.md ................... limitations, assumptions, future improvements
+  - README.md .................. accurate entry point linking all docs
+All content grounded in the actual build (no placeholders/hallucination).
 
 
 ========================================================================================================================
@@ -241,16 +279,17 @@ NEXT STEPS
 - [x] Task 3: Build reusable module (modules/lambda-api). [DONE - all 3 files verified]
 - [~] Task 4: Wire up dev and staging environments. [IN PROGRESS - dev files guidance provided]
 - [x] Task 5: Write Hello World application code (app/app.py). [DONE - saved & verified]
-- [ ] Task 6: Create CI/CD pipeline (GitHub Actions).
-- [ ] Task 7: Add dev -> staging promotion with manual approval.
-- [ ] Task 8: Write documentation:
-        - [ ] docs/architecture.md          (solution architecture + TF design decisions)
-        - [ ] docs/environment-separation.md (environment separation strategy)
-        - [ ] docs/cicd-workflow.md          (CI/CD workflow design)
-        - [ ] docs/deployment.md             (deployment instructions)
-        - [ ] docs/troubleshooting.md        (troubleshooting guidance)
-        - [ ] docs/faq.md                    (FAQ)
-        - [ ] docs/notes.md                  (limitations, assumptions, future improvements)
+- [x] Task 6: Create CI/CD pipeline (GitHub Actions). [DONE - full run green]
+- [x] Task 7: Add dev -> staging promotion with manual approval. [DONE - approval gate works]
+- [x] Task 8: Write documentation: [DONE]
+        - [x] docs/architecture.md          (solution architecture + TF design decisions)
+        - [x] docs/environment-separation.md (environment separation strategy)
+        - [x] docs/cicd-workflow.md          (CI/CD workflow design)
+        - [x] docs/deployment.md             (deployment instructions)
+        - [x] docs/troubleshooting.md        (troubleshooting guidance)
+        - [x] docs/faq.md                    (FAQ)
+        - [x] docs/notes.md                  (limitations, assumptions, future improvements)
+        - [x] README.md updated as accurate entry point
 - [ ] Task 9: Deploy to both environments and capture evidence.
 - [ ] Task 10: Final review prep (limitations, assumptions, future improvements).
 ========================================================================================================================
