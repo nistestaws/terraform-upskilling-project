@@ -1,0 +1,24 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars.backup
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Plan output files
+*.tfplan
+
+# App build artifact (pipeline rebuilds it)
+app/function.zip
+*.zip
+
+# OS / editor
+.DS_Store
+*.swp

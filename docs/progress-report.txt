@@ -1,0 +1,217 @@
+========================================================================================================================
+TERRAFORM UPSKILLING PROJECT - PROGRESS REPORT
+========================================================================================================================
+Engineer      : nishrisa
+Project       : Terraform End-to-End Solution (Infrastructure + Application CI/CD)
+Report Format : Plain text, no word wrap
+Report Start  : Monday, 20 July 2026
+Last Updated  : Tuesday, 21 July 2026
+========================================================================================================================
+
+
+------------------------------------------------------------------------------------------------------------------------
+DATE: Monday, 20 July 2026
+------------------------------------------------------------------------------------------------------------------------
+STATUS: Preparation / Learning
+
+- Completed required Terraform training courses (prerequisite for the project).
+- Reviewed the project requirements and deliverables.
+- Existing local practice folders present in workspace (01-basics through 10-real-world-project) used for learning.
+- No project deliverable code produced yet.
+
+
+------------------------------------------------------------------------------------------------------------------------
+DATE: Tuesday, 21 July 2026
+------------------------------------------------------------------------------------------------------------------------
+STATUS: Project kickoff - Task 1 complete, Task 2 planned
+
+PROJECT PLANNING
+- Defined full task breakdown (10 tasks) mapped to project requirements.
+- Created project folder structure under: terraform-project/
+
+  terraform-project/
+    modules/
+      networking/          (VPC, subnets, security groups - reusable)
+      app/                 (application infrastructure - reusable)
+    environments/
+      dev/                 (development environment)
+      staging/             (staging environment)
+    app/                   (application source code)
+    .github/workflows/     (CI/CD pipeline - GitHub Actions)
+    docs/                  (documentation + this report)
+    README.md
+
+TASK 1 - APPLICATION & PLATFORM DECISION [COMPLETE]
+- Chosen hosting platform: AWS Lambda + API Gateway (HTTP API).
+- Reason: simplest serverless option, low cost, fully manageable via Terraform.
+- Application: Python "Hello World" Lambda function.
+- State backend: S3 bucket + DynamoDB table (per-environment isolation via state keys).
+- CI/CD: GitHub Actions.
+- Environments: dev and staging (isolated state + separate deployment targets).
+
+- Confirmed the choice meets the two mandatory conditions:
+    1. Infrastructure managed through Terraform ...... YES (all AWS resources defined as TF resources)
+    2. Deployment performed through CI/CD pipeline ... YES (infra + app both deploy via pipeline)
+- Noted accepted exception: state backend bootstrap (S3 + DynamoDB) is run manually once
+  (chicken-and-egg: remote state cannot be stored before the backend exists). Standard practice.
+
+TASK 2 - BOOTSTRAP REMOTE STATE [IN PROGRESS]
+- Engineer input received: region = us-east-1, naming prefix = nishrisa.
+- Detailed implementation guidance provided for file: terraform-project/environments/bootstrap/main.tf
+- Resources to create (bootstrap uses LOCAL state on purpose):
+    * aws_s3_bucket ................................. nishrisa-terraform-state-us-east-1
+    * aws_s3_bucket_versioning ..................... status Enabled
+    * aws_s3_bucket_public_access_block ........... all four flags true (best practice)
+    * aws_s3_bucket_server_side_encryption_config . AES256 (best practice)
+    * aws_dynamodb_table .......................... nishrisa-terraform-locks
+                                                    (hash_key LockID type S, PAY_PER_REQUEST)
+- Key note: LockID key name is mandatory for S3 backend locking.
+- Note: provider v4+ requires versioning/encryption/public-access as SEPARATE resources.
+- Engineer updated main.tf; reviewed AGAIN and APPROVED:
+    * backend block removed (local state) - correct.
+    * naming consistent (all resources use "state").
+    * aws_s3_bucket_acl removed.
+    * public_access_block, AES256 encryption, and dynamodb_table (LockID) all present.
+    * provider pinned ~> 6.0.
+- Config is valid and follows best practices. Cleared to run apply.
+
+- ISSUE #1 (resolved - root cause identified):
+    Symptom: terraform plan/apply reported "No changes. 0 added" and state list was empty,
+             even though main.tf contained 6 resources.
+    Root cause: the main.tf edits were NOT SAVED in the editor when terraform ran.
+                Terraform reads from disk, so it evaluated the empty/older saved version.
+    Fix / lesson: always save the file (Cmd+S) before running any terraform command.
+
+- ISSUE #2 (in progress):
+    Symptom: "Error: Inconsistent dependency lock file - hashicorp/aws: required by this
+             configuration but no version is selected. Run terraform init."
+    Root cause: .terraform.lock.hcl had no AWS provider version recorded (stale after edits).
+    Fix: re-run `terraform init -upgrade` to select/lock provider ~> 6.0, then plan + apply.
+
+- RESOLUTION: terraform init -upgrade fixed the lock file. terraform plan showed 5 to add.
+- APPLY COMPLETE: 5 added, 0 changed, 0 destroyed.
+    Created:
+      * S3 bucket ......... nishrisa-terraform-state-us-east-1 (versioned, AES256, private)
+      * DynamoDB table .... nishrisa-terraform-locks (LockID, PAY_PER_REQUEST)
+- TASK 2 STATUS: COMPLETE.
+
+MODE OF WORK
+- Assistant provides step-by-step guidance and documentation references only.
+- Engineer writes and applies all Terraform code.
+
+
+------------------------------------------------------------------------------------------------------------------------
+DOCUMENTATION & DELIVERABLES COVERAGE PLAN (Requirement 6 + Deliverables)
+------------------------------------------------------------------------------------------------------------------------
+Confirmed each required documentation item and deliverable is mapped to a planned location.
+These are produced primarily in Task 8, with evidence captured in Task 9.
+
+DOCUMENTATION ITEMS (Requirement 6):
+  Solution architecture ......................... docs/architecture.md (with diagram)
+  Terraform structure & design decisions ........ docs/architecture.md + README.md
+  Environment separation strategy ............... docs/environment-separation.md
+  CI/CD workflow design ......................... docs/cicd-workflow.md
+  Deployment instructions ....................... README.md + docs/deployment.md
+  Troubleshooting guidance ...................... docs/troubleshooting.md
+  Frequently Asked Questions (FAQ) .............. docs/faq.md
+
+DELIVERABLES:
+  Source repo with Terraform code ............... modules/ , environments/
+  CI/CD pipeline configuration .................. .github/workflows/
+  Application source code / artifact ............ app/ (Lambda Hello World)
+  README and/or design documentation ........... README.md + docs/
+  Evidence of deployment to 2 environments ...... docs/evidence/ (screenshots, curl output, apply logs)
+  Known limitations / assumptions / future work . docs/notes.md
+
+
+------------------------------------------------------------------------------------------------------------------------
+TASK 3 - REUSABLE MODULES [COMPLETE]
+------------------------------------------------------------------------------------------------------------------------
+DESIGN DECISION: Dropped the planned "networking" (VPC) module.
+  Verified via AWS docs (configuration-vpc-internet.html, configuration-vpc.html):
+  Lambda runs in an AWS-managed VPC with internet access by default; a customer VPC is only
+  needed to reach PRIVATE resources. Our public Hello World does not, so no VPC = best practice
+  (avoid provisioning unused infrastructure).
+
+MODULE: modules/lambda-api/  (files: variables.tf, main.tf, outputs.tf)
+  Inputs: environment, function_name, lambda_zip_path, lambda_handler (def app.handler),
+          lambda_runtime (def python3.12), tags.
+  Resources (8):
+    1. aws_iam_role                     (trust lambda.amazonaws.com)
+    2. aws_iam_role_policy_attachment   (AWSLambdaBasicExecutionRole)
+    3. aws_lambda_function              (filename + source_code_hash = filebase64sha256)
+    4. aws_apigatewayv2_api             (protocol_type HTTP)
+    5. aws_apigatewayv2_integration     (AWS_PROXY, integration_uri = invoke_arn,
+                                         payload_format_version = "2.0")
+    6. aws_apigatewayv2_route           (route_key "GET /", target integrations/<id>)
+    7. aws_apigatewayv2_stage           (name "$default", auto_deploy true)
+    8. aws_lambda_permission            (principal apigateway.amazonaws.com,
+                                         source_arn = <api>.execution_arn/*/*)
+  Outputs: api_endpoint, function_name, function_arn.
+  VERIFIED DETAILS (docs): attribute is integration_uri (not uri) for apigatewayv2;
+                           add payload_format_version 2.0; lambda_permission source_arn /*/*.
+  STATUS: COMPLETE - all 3 files created by engineer and verified correct by assistant.
+
+------------------------------------------------------------------------------------------------------------------------
+TASK 5 - APPLICATION CODE [COMPLETE]
+------------------------------------------------------------------------------------------------------------------------
+- app/app.py created and verified. Python Hello World, handler app.handler, runtime python3.12.
+- Returns JSON {"message":"Hello World from Terraform!","environment":<env>}, reads ENVIRONMENT var.
+- Cleaned up stray empty folders modules/app and modules/networking.
+
+------------------------------------------------------------------------------------------------------------------------
+TASK 4 - ENVIRONMENTS (DEV + STAGING) [IN PROGRESS]
+------------------------------------------------------------------------------------------------------------------------
+DESIGN: each environment is a separate Terraform root with its OWN state file (isolation).
+  Same S3 bucket, different backend key:  dev/terraform.tfstate  vs  staging/terraform.tfstate.
+  Shared DynamoDB lock table: nishrisa-terraform-locks.
+
+DEV files (environments/dev/) - guidance provided:
+  backend.tf ...... terraform+provider block, s3 backend key=dev/terraform.tfstate, encrypt, lock table.
+  variables.tf .... aws_region, environment=dev, function_name=hello, lambda_zip_path=../../app/function.zip.
+  main.tf ......... module "app" { source = ../../modules/lambda-api } with tags.
+  outputs.tf ...... api_endpoint, function_name (from module outputs).
+
+STAGING files: same as dev with environment=staging and backend key=staging/terraform.tfstate.
+
+DEV DEPLOYMENT [COMPLETE - LIVE]:
+  - terraform init (S3 backend connected, module loaded), plan = 8 to add.
+  - apply complete: 8 added, 0 changed, 0 destroyed.
+  - Outputs: function_name = hello-dev
+             api_endpoint  = https://k6w4zkai83.execute-api.us-east-1.amazonaws.com/
+  - Verified: curl returned {"message":"Hello World from Terraform!","environment":...} (dev).
+  - This is EVIDENCE #1 (first of two required environments).
+
+STAGING DEPLOYMENT [COMPLETE - LIVE]:
+  - Files created (copy of dev; key = staging/terraform.tfstate, environment = staging).
+  - apply complete; Lambda hello-staging in isolated state file staging/terraform.tfstate.
+  - api_endpoint = https://6jvhegkgd1.execute-api.us-east-1.amazonaws.com/
+  - Verified: curl returned {"message":"Hello World from Terraform!","environment":"staging"}.
+  - This is EVIDENCE #2 (second required environment).
+
+ISOLATION PROOF: dev responds "environment":"dev", staging responds "environment":"staging",
+  separate endpoints, separate state keys, shared lock table. Two-environment requirement MET.
+
+TASK 4 STATUS: COMPLETE.
+
+
+========================================================================================================================
+NEXT STEPS
+========================================================================================================================
+- [x] Task 2: Write and apply bootstrap (S3 + DynamoDB) for remote state. [DONE]
+- [x] Task 3: Build reusable module (modules/lambda-api). [DONE - all 3 files verified]
+- [~] Task 4: Wire up dev and staging environments. [IN PROGRESS - dev files guidance provided]
+- [x] Task 5: Write Hello World application code (app/app.py). [DONE - saved & verified]
+- [ ] Task 6: Create CI/CD pipeline (GitHub Actions).
+- [ ] Task 7: Add dev -> staging promotion with manual approval.
+- [ ] Task 8: Write documentation:
+        - [ ] docs/architecture.md          (solution architecture + TF design decisions)
+        - [ ] docs/environment-separation.md (environment separation strategy)
+        - [ ] docs/cicd-workflow.md          (CI/CD workflow design)
+        - [ ] docs/deployment.md             (deployment instructions)
+        - [ ] docs/troubleshooting.md        (troubleshooting guidance)
+        - [ ] docs/faq.md                    (FAQ)
+        - [ ] docs/notes.md                  (limitations, assumptions, future improvements)
+- [ ] Task 9: Deploy to both environments and capture evidence.
+- [ ] Task 10: Final review prep (limitations, assumptions, future improvements).
+========================================================================================================================
