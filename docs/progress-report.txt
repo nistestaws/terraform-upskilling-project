@@ -293,3 +293,50 @@ NEXT STEPS
 - [ ] Task 9: Deploy to both environments and capture evidence.
 - [ ] Task 10: Final review prep (limitations, assumptions, future improvements).
 ========================================================================================================================
+
+
+========================================================================================================================
+CURRENT STATUS SNAPSHOT (Tuesday, 21 July 2026)
+========================================================================================================================
+DONE:
+  Task 2  State backend (S3 + DynamoDB) .................... COMPLETE
+  Task 3  Reusable module (modules/lambda-api) ............. COMPLETE
+  Task 4  Dev + staging environments (live, isolated) ...... COMPLETE  (Evidence #1 & #2)
+  Task 5  Hello World app (app/app.py) ..................... COMPLETE
+  Task 6  CI/CD pipeline (GitHub Actions, OIDC) ............ COMPLETE  (full run green)
+  Task 7  dev->staging promotion + manual approval ......... COMPLETE
+  Task 8  Documentation (docs/ + README) ................... COMPLETE  (on main via PR #2)
+
+GITHUB:
+  origin/main = 6039acb (includes PR #1 pipeline/OIDC + PR #2 docs).
+  All Terraform code, pipeline, app, and docs are on main.
+
+REMAINING:
+  Task 9  Capture deployment evidence (screenshots + curl outputs) -> docs/evidence/
+  Task 10 Final review prep (notes.md already covers limitations/assumptions/future work)
+========================================================================================================================
+
+
+------------------------------------------------------------------------------------------------------------------------
+PAUSE POINT (21 July 2026) - WHERE TO RESUME
+------------------------------------------------------------------------------------------------------------------------
+OUTSTANDING TODOs:
+  [ ] REMINDER: Add 3 pipeline screenshots to docs/evidence/ before submission:
+        - GitHub Actions run: deploy-dev green + deploy-staging green
+        - Staging manual approval record (Review deployments -> Approved)
+        - PR with plan check green (optional)
+      Then: git add docs/evidence/ && git commit -m "Add deployment evidence" && git push
+
+  [ ] PRACTICE EXERCISE (in progress) - learn the update workflow:
+        Goal: change app message and ship it through CI/CD to see hash-driven redeploy.
+        Steps:
+          1. git checkout main && git pull && git checkout -b update-message
+          2. Edit app/app.py message -> "Hello World from Terraform! (v2)"
+          3. git add app/app.py && git commit -m "Update message to v2" && git push -u origin update-message
+          4. Open PR update-message -> main; watch plan job (expect Lambda "update in place").
+          5. Review plan, then merge -> deploy-dev auto; approve staging gate.
+          6. curl both endpoints -> confirm "(v2)" message in dev and staging.
+
+STATUS: Tasks 2-8 COMPLETE. Task 9 partial (curl evidence done, screenshots pending).
+        Task 10 covered by docs/notes.md. Solution is functional and on GitHub main (6039acb).
+------------------------------------------------------------------------------------------------------------------------
