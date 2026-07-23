@@ -1,0 +1,46 @@
+========================================================================
+DEPLOYMENT EVIDENCE - APPLICATION RESPONSES (LIVE)
+========================================================================
+Captured (UTC) : 2026-07-21T08:26:55Z
+AWS account    : 122788298805
+Region         : us-east-1
+Method         : curl against each environment's API Gateway endpoint
+
+------------------------------------------------------------------------
+DEV
+------------------------------------------------------------------------
+Endpoint : https://k6w4zkai83.execute-api.us-east-1.amazonaws.com/
+Command  : curl https://k6w4zkai83.execute-api.us-east-1.amazonaws.com/
+Response : {"message": "Hello World from Terraform!", "environment": "dev"}
+Status   : HTTP 200
+
+------------------------------------------------------------------------
+STAGING
+------------------------------------------------------------------------
+Endpoint : https://6jvhegkgd1.execute-api.us-east-1.amazonaws.com/
+Command  : curl https://6jvhegkgd1.execute-api.us-east-1.amazonaws.com/
+Response : {"message": "Hello World from Terraform!", "environment": "staging"}
+Status   : HTTP 200
+
+------------------------------------------------------------------------
+ISOLATION PROOF
+------------------------------------------------------------------------
+Same application, two separate deployments:
+  - dev     responds "environment": "dev"
+  - staging responds "environment": "staging"
+Separate API Gateway endpoints, separate Lambda functions (hello-dev / hello-staging),
+separate Terraform state files (dev/terraform.tfstate vs staging/terraform.tfstate).
+
+------------------------------------------------------------------------
+LIVE AWS RESOURCES (verified via AWS CLI)
+------------------------------------------------------------------------
+Lambda functions : hello-dev, hello-staging
+API Gateways     : hello-dev-api, hello-staging-api
+
+------------------------------------------------------------------------
+SCREENSHOTS TO ADD ALONGSIDE THIS FILE (docs/evidence/)
+------------------------------------------------------------------------
+[ ] GitHub Actions run: deploy-dev green + deploy-staging green
+[ ] Staging manual approval record (Review deployments -> Approved)
+[ ] PR with the plan check green (optional)
+========================================================================
